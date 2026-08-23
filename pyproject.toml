@@ -1,0 +1,15 @@
+[project]
+name = "00-simple-llm-app"
+version = "0.1.0"
+description = "CLI for LLM app"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=3.3.1",
+]
+
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
