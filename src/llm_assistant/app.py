@@ -1,9 +1,21 @@
-from .llm import call_llm_assistant
+class App:
+    def __init__(self, llm, conversation):
+        self.llm = llm
+        self.conversation = conversation
 
+    def ask(self, question: str) -> str:
+        self.conversation.add_user_message(question)
 
-def ask(question: str) -> str:
-    """
-    This function is a placeholder for the 'ask' operation.
-    It currently does not perform any action and will be implemented in the future.
-    """
-    return call_llm_assistant(question)
+        response = self.llm.generate(self.conversation.get_messages())
+
+        if response.startswith("Error calling OpenAI API: "):
+            self.conversation.remove_last_message()
+        else:
+            self.conversation.add_assistant_message(response)
+
+        print(f"conversation: {self.conversation.messages}")
+        return response
+
+    def clear(self) -> str:
+        self.conversation.clear()
+        return "conversation clear"
