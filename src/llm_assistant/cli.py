@@ -1,22 +1,54 @@
 import argparse
+import sys
 
 from .app import ask
 
 
 def CLI() -> None:
     # 1. Create parser
-    parser = argparse.ArgumentParser(description="provide a CLI for the LLM Assistant")
+    parser = argparse.ArgumentParser(prog="uv run main.py", description="provide a interactive shell for LLM Assistant")
+    parser.add_argument("-q", "--question", help="the question for LLM assistant to answer")
+    parser.add_argument("-i", "--interactive", action="store_true", help="Interactive mode")
 
-    # 2. Add arguments
-    parser.add_argument("operation", help="the operation user wants to perform, only one operation for now: 'ask'")
-    parser.add_argument("question", help="the question for the operation")
 
-    # 3. Parse arguments
     args = parser.parse_args()
+    # 2. return answer if not interactive
+    if not args.interactive:
+        answer = ask(args.question)
+        print(f"Assistant: {answer}")
+        return
 
-    # 4. call llm assistant function
-    answer = ask(args.question)
-    # 5. print llm response
-    print(
-        f"{answer}"
-    )
+    # --Interactive mode--
+
+    # First, keep ArgParser from exiting on invalid input
+    class InvalidArgs(Exception):
+        pass
+    def exit(*args, **kwargs):
+        raise InvalidArgs
+    parser.exit = exit
+
+
+    print("Enter your questions. Use 'help' for info, 'ctrl + c or ctrl + d' to leave.")
+    while True:
+        try:
+            question = input("You: ").strip()
+        except KeyboardInterrupt:
+            # Ctrl-c clears the input
+            sys.stdout.write('\n')
+            break
+        except EOFError:
+            # Ctrl-d exits
+            sys.stdout.write('\n')
+            break
+
+        if question == 'help':
+            parser.print_help()
+            continue
+
+        try:
+            answer = ask(question)
+            print(f"Assistant: {answer}\n")
+        except InvalidArgs:
+            print("Issue happened when fetching result from the LLM.")
+            break
+
