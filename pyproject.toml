@@ -1,15 +1,23 @@
 [project]
-name = "00-simple-llm-app"
+name = "llm-assistant"
 version = "0.1.0"
-description = "CLI for LLM app"
+description = "a simple LLM CLI app"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openai>=3.3.1",
 ]
 
+[project.scripts]
+ai = "llm_assistant.cli:main"
+
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

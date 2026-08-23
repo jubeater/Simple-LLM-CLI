@@ -1,12 +1,6 @@
 class Conversation:
     def __init__(self, system_prompt: str | None = None):
-        self.messages = [{"role": "fake", "content": "fake conversation"}]
-
-        if system_prompt:
-            self.messages.append({
-                "role": "system",
-                "content": system_prompt,
-            })
+        self.messages = []
 
     def add_user_message(self, content: str) -> None:
         self.messages.append({
@@ -21,7 +15,8 @@ class Conversation:
         })
 
     def remove_last_message(self) -> None:
-        self.messages.pop()
+        if len(self.messages) > 0:
+            self.messages.pop()
 
     def get_messages(self) -> list[dict[str, str]]:
         return self.messages.copy()

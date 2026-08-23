@@ -1,3 +1,6 @@
+from llm_assistant.llm import LLMError
+
+
 class App:
     def __init__(self, llm, conversation):
         self.llm = llm
@@ -6,14 +9,13 @@ class App:
     def ask(self, question: str) -> str:
         self.conversation.add_user_message(question)
 
-        response = self.llm.generate(self.conversation.get_messages())
-
-        if response.startswith("Error calling OpenAI API: "):
+        try:
+            response = self.llm.generate(self.conversation.get_messages())
+        except LLMError:
             self.conversation.remove_last_message()
-        else:
-            self.conversation.add_assistant_message(response)
+            raise
 
-        print(f"conversation: {self.conversation.messages}")
+        self.conversation.add_assistant_message(response)
         return response
 
     def clear(self) -> str:
