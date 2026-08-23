@@ -1,4 +1,8 @@
+import logging
+
 from llm_assistant.llm import LLMError
+
+logger = logging.getLogger(__name__)
 
 
 class App:
@@ -13,6 +17,7 @@ class App:
             response = self.llm.generate(self.conversation.get_messages())
         except LLMError:
             self.conversation.remove_last_message()
+            logger.info("Removed failed question from conversation", extra={"question": question})
             raise
 
         self.conversation.add_assistant_message(response)

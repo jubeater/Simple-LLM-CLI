@@ -1,6 +1,14 @@
 import argparse
+import logging
 import os
 import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 from llm_assistant.app import App
 from llm_assistant.conversation import Conversation
@@ -19,12 +27,16 @@ def main() -> None:
         max_output_token = os.getenv("AI_MAX_OUTPUT_TOKENS", "1000")
         max_output_token = int(max_output_token)
     except ValueError:
+        logger.warning("Invalid int for max token limit",
+                       extra={"value": max_output_token, "from": "environment variable"})
         print("Invalid max_output_token get from environment, will use default")
         max_output_token = 1000
     try:
         temperature = os.getenv("AI_TEMPERATURE", "1.0")
         temperature = float(temperature)
     except ValueError:
+        logger.warning("Invalid float for temperature",
+                       extra={"value": temperature, "from": "environment variable"})
         print("Invalid temperature get from environment, will use default")
         temperature = 0.7
 
@@ -57,6 +69,9 @@ def main() -> None:
             print(f"Set max output token limit to {int_max_output_token}")
             max_output_token = int_max_output_token
         except ValueError:
+            logger.warning("Invalid int for max token limit",
+                           extra={"value": args.max_output_token, "from": "user input"}
+                           )
             print("Max token input is not int, will keep default.")
 
     if args.temperature is not None:
@@ -65,6 +80,8 @@ def main() -> None:
             print(f"Set temperature to {float_temperature}")
             temperature = float_temperature
         except ValueError:
+            logger.warning("Invalid float for temperature",
+                extra={"value": temperature, "from": "user input"})
             print("Temperature input is not float, will keep default.")
 
     # 3. Initilization
@@ -95,9 +112,11 @@ def main() -> None:
         except KeyboardInterrupt:
             # Ctrl-c clears the input
             sys.stdout.write("\n")
+            logger.info("Interactive session interrupted by user")
             break
         except EOFError:
             # Ctrl-d exits
+            logger.info("Interactive session ended by EOF")
             sys.stdout.write("\n")
             break
 

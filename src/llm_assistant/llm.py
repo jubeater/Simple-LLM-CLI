@@ -1,5 +1,9 @@
+import time
+import logging
+
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI
 
+logger = logging.getLogger(__name__)
 
 class LLMError(Exception):
     pass
@@ -23,14 +27,22 @@ class LLM:
         try:
             # https://developers.openai.com/api/docs/guides/conversation-state
             # Generate text with messages using different roles -> ["user", "assistant"]
+            logger.info("LLM request started", extra={"model": self.model_name})
+            start = time.perf_counter()
             response = self.client.responses.create(
                 model=self.model_name,
                 input=conversation,
                 max_output_tokens=self.max_output_token,
                 temperature=self.temperature
             )
+            duration = time.perf_counter() - start
+            logger.info(
+                "LLM request completed",
+                extra={"model": self.model_name, "duration": duration},
+            )
             if not response.output_text or not response.output_text.strip():
                 raise LLMError("OpenAI return empty response body")
             return response.output_text
         except (APITimeoutError, APIStatusError, APIError) as error:
+            logger.exception("LLM request failed")
             raise LLMError("Unable to get a response from OpenAI") from error

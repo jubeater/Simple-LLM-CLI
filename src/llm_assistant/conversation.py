@@ -1,5 +1,5 @@
 class Conversation:
-    def __init__(self, system_prompt: str | None = None):
+    def __init__(self):
         self.messages = []
 
     def add_user_message(self, content: str) -> None:
