@@ -23,6 +23,5 @@ class App:
         self.conversation.add_assistant_message(response)
         return response
 
-    def clear(self) -> str:
+    def clear(self):
         self.conversation.clear()
-        return "conversation clear"

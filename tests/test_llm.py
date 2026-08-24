@@ -19,6 +19,14 @@ def test_get_model_name(llm):
     assert llm.get_model_name() == "modelA"
 
 
+def test_get_max_output_token(llm):
+    assert llm.get_max_output_token() == 100
+
+
+def test_get_temperature(llm):
+    assert llm.get_temperature() == 0.3
+
+
 def test_set_model_name(llm):
     llm.set_model_name("modelB")
     assert llm.model_name == "modelB"

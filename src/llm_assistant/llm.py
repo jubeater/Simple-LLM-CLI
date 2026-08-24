@@ -1,5 +1,5 @@
-import time
 import logging
+import time
 
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI
 
@@ -22,6 +22,12 @@ class LLM:
 
     def set_model_name(self, model_name: str) -> None:
         self.model_name = model_name
+
+    def get_max_output_token(self) -> int:
+        return self.max_output_token
+
+    def get_temperature(self) -> float:
+        return self.temperature
 
     def generate(self, conversation) -> str | None:
         try:
