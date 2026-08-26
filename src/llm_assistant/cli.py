@@ -30,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-m", "--model", help="Set model of LLM.")
     parser.add_argument(
-        "-mot", "--max_output_token", type=int, help="Set max output token limit."
+        "-mot", "--max_output_tokens", type=int, help="Set max output token limit."
     )
     parser.add_argument(
         "-t", "--temperature", type=float, help="Set temperature of the answer."
@@ -93,7 +93,7 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
             print("Configuration")
             print("---------------------------------------")
             print(f"Model:            {cur_config.model}")
-            print(f"Max output token: {cur_config.max_output_token}")
+            print(f"Max output token: {cur_config.max_output_tokens}")
             print(f"Temperature:      {cur_config.temperature}")
 
         elif user_input == "/help":
