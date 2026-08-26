@@ -4,9 +4,8 @@ import os
 import sys
 from dataclasses import dataclass
 
-from llm_assistant.app import App
-from llm_assistant.conversation import Conversation
-from llm_assistant.llm import LLM, LLMError
+from llm_assistant.app import App, create_app
+from llm_assistant.llm import LLMError
 
 DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_MAX_TOKEN_LIMIT = 1000
@@ -93,12 +92,6 @@ def load_config(args: argparse.Namespace) -> Config:
     return Config(model_name, max_output_token, temperature)
 
 
-def create_app(config: Config) -> App:
-    llm = LLM(config.model, config.max_output_token, config.temperature)
-    conversation = Conversation()
-    return App(llm, conversation)
-
-
 def run_one_shot(app: App, question: str | None) -> None:
     if not question:
         print("You need to give an input question")
@@ -133,20 +126,21 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
             print("no input\n")
 
         elif user_input == "/model":
-            print(f"Current model is: {app.llm.get_model_name()}")
+            cur_config = app.get_config()
+            print(f"Current model is: {cur_config.model}")
 
         elif user_input.startswith("/model "):
             input_model = user_input[len("/model ") :].strip()
-            # little hack on llm
-            app.llm.set_model_name(input_model)
+            app.set_model_name(input_model)
             print(f"Model switched to {input_model}")
 
         elif user_input == "/config":
+            cur_config = app.get_config()
             print("Configuration")
             print("---------------------------------------")
-            print(f"Model:            {app.llm.get_model_name()}")
-            print(f"Max output token: {app.llm.get_max_output_token()}")
-            print(f"Temperature:      {app.llm.get_temperature()}")
+            print(f"Model:            {cur_config.model}")
+            print(f"Max output token: {cur_config.max_output_token}")
+            print(f"Temperature:      {cur_config.temperature}")
 
         elif user_input == "/help":
             parser.print_help()

@@ -1,6 +1,8 @@
 import logging
 
-from llm_assistant.llm import LLMError
+from llm_assistant.cli import Config
+from llm_assistant.conversation import Conversation
+from llm_assistant.llm import LLM, LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,10 @@ class App:
             response = self.llm.generate(self.conversation.get_messages())
         except LLMError:
             self.conversation.remove_last_message()
-            logger.info("Removed failed question from conversation", extra={"question": question})
+            logger.info(
+                "Removed failed question from conversation",
+                extra={"question": question},
+            )
             raise
 
         self.conversation.add_assistant_message(response)
@@ -25,3 +30,15 @@ class App:
 
     def clear(self):
         self.conversation.clear()
+
+    def set_model_name(self, model_name) -> None:
+        self.llm.set_model_name(model_name)
+
+    def get_config(self) -> Config:
+        return self.llm.get_config()
+
+
+def create_app(config: Config) -> App:
+    llm = LLM(config.model, config.max_output_token, config.temperature)
+    conversation = Conversation()
+    return App(llm, conversation)
