@@ -12,13 +12,20 @@ DEFAULT_TEMPERATURE = 1.0
 
 
 @dataclass
-class Config:
+class UserConfig:
+    model: str | None
+    max_output_tokens: int | None
+    temperature: float | None
+
+
+@dataclass
+class LLMConfig:
     model: str
     max_output_tokens: int
     temperature: float
 
 
-def load_config(config: Config) -> Config:
+def load_config(config: UserConfig) -> LLMConfig:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ConfigError("OPENAI_API_KEY is not set")
@@ -54,4 +61,4 @@ def load_config(config: Config) -> Config:
             temperature = DEFAULT_TEMPERATURE
     else:
         temperature = config.temperature
-    return Config(model_name, max_output_tokens, temperature)
+    return LLMConfig(model_name, max_output_tokens, temperature)

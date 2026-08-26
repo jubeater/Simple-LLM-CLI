@@ -3,7 +3,7 @@ import logging
 import sys
 
 from llm_assistant.app import App, create_app
-from llm_assistant.config import Config, load_config
+from llm_assistant.config import LLMConfig, UserConfig, load_config
 from llm_assistant.errors import ConfigError, LLMError
 
 
@@ -30,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-m", "--model", help="Set model of LLM.")
     parser.add_argument(
-        "-mot", "--max_output_tokens", type=int, help="Set max output token limit."
+        "--max_output_tokens", type=int, help="Set max output token limit."
     )
     parser.add_argument(
         "-t", "--temperature", type=float, help="Set temperature of the answer."
@@ -41,21 +41,21 @@ def create_parser() -> argparse.ArgumentParser:
 
 def parse_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
     args = parser.parse_args()
-    if args.model is not None:
-        print(f"Using the model {args.model} to answer now...")
     return args
 
 
-def run_one_shot(app: App, question: str | None) -> None:
+def run_one_shot(app: App, question: str | None) -> int:
     if not question:
         print("You need to give an input question")
-        return
+        return 1
 
     try:
         answer = app.ask(question)
         print(f"Assistant: {answer}")
+        return 0
     except LLMError as error:
         print(f"Assistant error: {error}")
+        return 1
 
 
 def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
@@ -118,20 +118,26 @@ def main() -> int:
     configure_logging()
     parser = create_parser()
     args = parse_args(parser)
-    user_config = Config(args.model, args.temperature, args.max_output_tokens)
+    if args.model is not None:
+        print(f"Using the model {args.model} to answer now...")
+
+    user_config = UserConfig(
+        model=args.model,
+        temperature=args.temperature,
+        max_output_tokens=args.max_output_tokens,
+    )
     try:
         app_config = load_config(user_config)
-    except ConfigError as e:
-        print(f"Configuration error: {e}")
+    except ConfigError as error:
+        print(f"Configuration error: {error}")
         return 1
     app = create_app(app_config)
 
     if args.interactive:
         run_interactive(app, parser)
-    else:
-        run_one_shot(app, args.question)
-    return 0
+        return 1
+    return run_one_shot(app, args.question)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

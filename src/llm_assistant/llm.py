@@ -3,7 +3,7 @@ import time
 
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI
 
-from llm_assistant.config import Config
+from llm_assistant.config import LLMConfig
 from llm_assistant.errors import LLMError
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,8 @@ class LLM:
     def set_model_name(self, model_name: str) -> None:
         self.model_name = model_name
 
-    def get_config(self) -> Config:
-        return Config(self.model_name, self.max_output_token, self.temperature)
+    def get_config(self) -> LLMConfig:
+        return LLMConfig(self.model_name, self.max_output_token, self.temperature)
 
     def generate(self, messages) -> str:
         try:

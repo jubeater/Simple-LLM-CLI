@@ -1,6 +1,6 @@
 import logging
 
-from llm_assistant.config import Config
+from llm_assistant.config import LLMConfig
 from llm_assistant.conversation import Conversation
 from llm_assistant.errors import LLMError
 from llm_assistant.llm import LLM
@@ -35,11 +35,11 @@ class App:
     def set_model_name(self, model_name) -> None:
         self.llm.set_model_name(model_name)
 
-    def get_config(self) -> Config:
+    def get_config(self) -> LLMConfig:
         return self.llm.get_config()
 
 
-def create_app(config: Config) -> App:
+def create_app(config: LLMConfig) -> App:
     llm = LLM(config.model, config.max_output_tokens, config.temperature)
     conversation = Conversation()
     return App(llm, conversation)
