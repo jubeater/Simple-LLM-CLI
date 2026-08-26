@@ -2,7 +2,8 @@ import logging
 
 from llm_assistant.cli import Config
 from llm_assistant.conversation import Conversation
-from llm_assistant.llm import LLM, LLMError
+from llm_assistant.errors import LLMError
+from llm_assistant.llm import LLM
 
 logger = logging.getLogger(__name__)
 

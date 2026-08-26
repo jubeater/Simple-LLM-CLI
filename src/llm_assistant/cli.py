@@ -1,22 +1,10 @@
 import argparse
 import logging
-import os
 import sys
-from dataclasses import dataclass
 
 from llm_assistant.app import App, create_app
-from llm_assistant.llm import LLMError
-
-DEFAULT_MODEL = "gpt-5.4-mini"
-DEFAULT_MAX_TOKEN_LIMIT = 1000
-DEFAULT_TEMPERATURE = 1.0
-
-
-@dataclass
-class Config:
-    model: str
-    max_output_token: int
-    temperature: float
+from llm_assistant.config import Config, load_config
+from llm_assistant.errors import ConfigError, LLMError
 
 
 def configure_logging() -> None:
@@ -56,40 +44,6 @@ def parse_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
     if args.model is not None:
         print(f"Using the model {args.model} to answer now...")
     return args
-
-
-def load_config(args: argparse.Namespace) -> Config:
-    if args.model == None:
-        model_name = os.getenv("AI_MODEL", DEFAULT_MODEL)
-    else:
-        model_name = args.model
-    if args.max_output_token == None:
-        try:
-            max_output_token = os.getenv("AI_MAX_OUTPUT_TOKEN", DEFAULT_MAX_TOKEN_LIMIT)
-            max_output_token = int(max_output_token)
-        except ValueError:
-            logger.warning(
-                "Invalid int for max token limit",
-                extra={"value": max_output_token, "from": "environment variable"},
-            )
-            print("Invalid max_output_token get from environment, will use default")
-            max_output_token = DEFAULT_MAX_TOKEN_LIMIT
-    else:
-        max_output_token = args.max_output_token
-    if args.temperature == None:
-        try:
-            temperature = os.getenv("AI_TEMPERATURE", DEFAULT_TEMPERATURE)
-            temperature = float(temperature)
-        except ValueError:
-            logger.warning(
-                "Invalid float for temperature",
-                extra={"value": temperature, "from": "environment variable"},
-            )
-            print("Invalid temperature get from environment, will use default")
-            temperature = DEFAULT_TEMPERATURE
-    else:
-        temperature = args.temperature
-    return Config(model_name, max_output_token, temperature)
 
 
 def run_one_shot(app: App, question: str | None) -> None:
@@ -160,21 +114,23 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
                 print(f"Assistant error: {error}")
 
 
-def main() -> None:
-    if "OPENAI_API_KEY" not in os.environ:
-        print("Please set OPENAI API key in your environment first")
-        return
-
+def main() -> int:
     configure_logging()
     parser = create_parser()
     args = parse_args(parser)
-    config = load_config(args)
-    app = create_app(config)
+    user_config = Config(args.model, args.temperature, args.max_output_tokens)
+    try:
+        app_config = load_config(user_config)
+    except ConfigError as e:
+        print(f"Configuration error: {e}")
+        return 1
+    app = create_app(app_config)
 
     if args.interactive:
         run_interactive(app, parser)
     else:
         run_one_shot(app, args.question)
+    return 0
 
 
 if __name__ == "__main__":

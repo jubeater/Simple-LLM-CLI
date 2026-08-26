@@ -3,13 +3,10 @@ import time
 
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI
 
-from llm_assistant.cli import Config
+from llm_assistant.config import Config
+from llm_assistant.errors import LLMError
 
 logger = logging.getLogger(__name__)
-
-
-class LLMError(Exception):
-    pass
 
 
 # only support openAI now
@@ -28,7 +25,7 @@ class LLM:
     def get_config(self) -> Config:
         return Config(self.model_name, self.max_output_token, self.temperature)
 
-    def generate(self, conversation) -> str | None:
+    def generate(self, messages) -> str:
         try:
             # https://developers.openai.com/api/docs/guides/conversation-state
             # Generate text with messages using different roles -> ["user", "assistant"]
@@ -36,7 +33,7 @@ class LLM:
             start = time.perf_counter()
             response = self.client.responses.create(
                 model=self.model_name,
-                input=conversation,
+                input=messages,
                 max_output_tokens=self.max_output_token,
                 temperature=self.temperature,
             )
