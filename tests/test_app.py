@@ -4,7 +4,7 @@ import pytest
 
 from llm_assistant.app import App
 from llm_assistant.conversation import Conversation
-from llm_assistant.llm import LLMError, LLMStreamError
+from llm_assistant.llm import LLMStreamError
 from llm_assistant.models import StreamResult, Usage
 
 
@@ -91,6 +91,7 @@ def test_ask_stream_failure_does_not_commit_partial_response():
 
     assert app.session_metrics.request_count == 0
     assert app.session_metrics.error_count == 1
+    assert mock_llm.generate_stream.call_count == 1
 
 
 def test_clear():

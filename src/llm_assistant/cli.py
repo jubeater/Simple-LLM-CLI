@@ -162,7 +162,7 @@ def main() -> int:
 
     if args.interactive:
         run_interactive(app, parser)
-        return 1
+        return 0
     return run_one_shot(app, args.question)
 
 

@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from openai import APIError, APIStatusError, APITimeoutError
+from openai import APIError
 
 from llm_assistant.errors import LLMError, LLMStreamError
 from llm_assistant.llm import LLM

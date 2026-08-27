@@ -18,12 +18,15 @@ class App:
     def ask(self, question: str):
         self.conversation.add_user_message(question)
         retry_count = 0
+        has_received_text = False
         while True:
             try:
                 response_chunks = []
                 messages = self.conversation.get_messages()
                 for event in self.llm.generate_stream(messages):
                     if isinstance(event, str):
+                        if not has_received_text:
+                            has_received_text = True
                         response_chunks.append(event)
                         yield event
                     elif isinstance(event, StreamResult):
@@ -32,11 +35,31 @@ class App:
                             "".join(response_chunks)
                         )
                         self.session_metrics.last_latency = event.total_duration
-                        if self.session_metrics.total_latency == None:
+                        if self.session_metrics.total_latency is None:
                             self.session_metrics.total_latency = event.total_duration
-                        elif event.total_duration != None:
+                        elif event.total_duration is not None:
                             self.session_metrics.total_latency += event.total_duration
-                        self.session_metrics.total_usage = event.usage
+                        if (
+                            self.session_metrics.total_usage.input_tokens is not None
+                            and event.usage.input_tokens is not None
+                        ):
+                            self.session_metrics.total_usage.input_tokens += (
+                                event.usage.input_tokens
+                            )
+                        if (
+                            self.session_metrics.total_usage.output_tokens is not None
+                            and event.usage.output_tokens is not None
+                        ):
+                            self.session_metrics.total_usage.output_tokens += (
+                                event.usage.output_tokens
+                            )
+                        if (
+                            self.session_metrics.total_usage.total_tokens is not None
+                            and event.usage.total_tokens is not None
+                        ):
+                            self.session_metrics.total_usage.total_tokens += (
+                                event.usage.total_tokens
+                            )
                 break
             except LLMError:
                 self.conversation.remove_last_message()
@@ -47,7 +70,7 @@ class App:
                 self.session_metrics.error_count += 1
                 raise
             except LLMStreamError:
-                if retry_count >= NETWORK_ERR_RETRY_THRESHOLD:
+                if retry_count >= NETWORK_ERR_RETRY_THRESHOLD or has_received_text:
                     self.conversation.remove_last_message()
                     self.session_metrics.error_count += 1
                     raise
