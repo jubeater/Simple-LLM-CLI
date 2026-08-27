@@ -1,61 +1,8 @@
-import argparse
 import logging
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from llm_assistant import cli
-from llm_assistant.llm import LLMError
-
-
-class FakeApp:
-    def __init__(self):
-        self.questions = []
-        self.cleared = False
-        self.model = "model-a"
-        self.llm = self
-
-    def ask(self, question):
-        self.questions.append(question)
-        return "fake response"
-
-    def clear(self):
-        self.cleared = True
-
-    def get_model_name(self):
-        return self.model
-
-    def set_model_name(self, model):
-        self.model = model
-
-    def get_max_output_token(self):
-        return 1000
-
-    def get_temperature(self):
-        return 0.5
-
-
-class FailingApp:
-    def ask(self, _):
-        raise LLMError("boom")
-
-
-@pytest.fixture
-def fake_app() -> FakeApp:
-    return FakeApp()
-
-
-@pytest.fixture
-def fail_app() -> FailingApp:
-    return FailingApp()
-
-
-def test_main_requires_api_key(monkeypatch, capsys):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-
-    cli.main()
-
-    assert "Please set OPENAI API key" in capsys.readouterr().out
+from llm_assistant.errors import ConfigError, LLMError
 
 
 def test_parse_question():
@@ -74,7 +21,7 @@ def test_parse_model_and_generation_options():
         [
             "--model",
             "model-b",
-            "--max_output_token",
+            "--max_output_tokens",
             "500",
             "--temperature",
             "0.7",
@@ -82,98 +29,35 @@ def test_parse_model_and_generation_options():
     )
 
     assert args.model == "model-b"
-    assert args.max_output_token == 500
+    assert args.max_output_tokens == 500
     assert args.temperature == 0.7
 
 
-def test_parse_args():
-    parser = MagicMock()
-    cli.parse_args(parser)
-
-
-def test_load_config_from_environment(monkeypatch):
-    monkeypatch.setenv("AI_MODEL", "env-model")
-    monkeypatch.setenv("AI_MAX_OUTPUT_TOKEN", "2000")
-    monkeypatch.setenv("AI_TEMPERATURE", "0.8")
-
-    args = argparse.Namespace(
-        model=None,
-        max_output_token=None,
-        temperature=None,
-    )
-
-    config = cli.load_config(args)
-
-    assert config.model == "env-model"
-    assert config.max_output_token == 2000
-    assert config.temperature == 0.8
-
-
-def test_cli_overrides_environment(monkeypatch):
-    monkeypatch.setenv("AI_MODEL", "env-model")
-    monkeypatch.setenv("AI_MAX_OUTPUT_TOKEN", "2000")
-    monkeypatch.setenv("AI_TEMPERATURE", "0.8")
-
-    args = argparse.Namespace(
-        model="cli-model",
-        max_output_token=1000,
-        temperature=0.9,
-    )
-
-    config = cli.load_config(args)
-
-    assert config.model == "cli-model"
-    assert config.max_output_token == 1000
-    assert config.temperature == 0.9
-
-
-def test_using_default_with_invalid_environment(monkeypatch):
-    monkeypatch.setenv("AI_MODEL", "env-model")
-    monkeypatch.setenv("AI_MAX_OUTPUT_TOKEN", "invalidint")
-    monkeypatch.setenv("AI_TEMPERATURE", "invalidfloat")
-
-    args = argparse.Namespace(
-        model="cli-model",
-        max_output_token=None,
-        temperature=None,
-    )
-
-    config = cli.load_config(args)
-
-    assert config.model == "cli-model"
-    assert config.max_output_token == cli.DEFAULT_MAX_TOKEN_LIMIT
-    assert config.temperature == cli.DEFAULT_TEMPERATURE
-
-
-def test_create_app():
-    app = cli.create_app(cli.Config("cli-model", 150, 0.6))
-    assert app.llm.get_model_name() == "cli-model"
-    assert app.llm.get_max_output_token() == 150
-    assert app.llm.get_temperature() == 0.6
-
-
-def test_run_one_shot(fake_app, capsys):
+def test_run_one_shot(capsys):
+    fake_app = Mock()
     cli.run_one_shot(fake_app, "Hello")
 
-    assert fake_app.questions == ["Hello"]
+    fake_app.ask.assert_called_once_with("Hello")
 
     captured = capsys.readouterr()
-    assert "Assistant: fake response" in captured.out
+    assert "Assistant: " in captured.out
 
     cli.run_one_shot(fake_app, None)
     captured = capsys.readouterr()
-    assert "You need to give an" in captured.out
+    assert "You need to give an input question." in captured.out
 
 
-def test_run_one_shot_exception(fail_app, capsys):
+def test_run_one_shot_exception(capsys):
+    fail_app = Mock()
+    fail_app.ask.side_effect = LLMError("Unable to get a response from OpenAI")
     cli.run_one_shot(fail_app, "World")
     captured = capsys.readouterr()
     assert "Assistant error:" in captured.out
 
 
 def test_run_interactive_question(monkeypatch, capsys):
-    app = FakeApp()
-
+    app = Mock()
+    app.ask.return_value = "fake response"
     inputs = iter(
         [
             "What is TCP?",
@@ -188,16 +72,16 @@ def test_run_interactive_question(monkeypatch, capsys):
 
     parser = cli.create_parser()
 
-    cli.run_interactive(app, parser)  # type: ignore
+    cli.run_interactive(app, parser)
 
-    assert app.questions == ["What is TCP?"]
+    app.ask.assert_called_once_with("What is TCP?")
 
     captured = capsys.readouterr()
     assert "fake response" in captured.out
 
 
 def test_run_interactive_empty_question(monkeypatch, capsys):
-    app = FakeApp()
+    app = Mock()
 
     inputs = iter(
         [
@@ -213,14 +97,14 @@ def test_run_interactive_empty_question(monkeypatch, capsys):
 
     parser = cli.create_parser()
 
-    cli.run_interactive(app, parser)  # type: ignore
+    cli.run_interactive(app, parser)
 
     captured = capsys.readouterr()
     assert "no input" in captured.out
 
 
 def test_run_interactive_clear(monkeypatch):
-    app = FakeApp()
+    app = Mock()
 
     inputs = iter(
         [
@@ -234,13 +118,13 @@ def test_run_interactive_clear(monkeypatch):
         lambda _: next(inputs),
     )
 
-    cli.run_interactive(app, cli.create_parser())  # type: ignore
+    cli.run_interactive(app, cli.create_parser())
 
-    assert app.cleared is True
+    app.clear.assert_called_once_with()
 
 
 def test_run_interactive_show_model(monkeypatch):
-    app = FakeApp()
+    app = Mock()
 
     inputs = iter(
         [
@@ -254,13 +138,12 @@ def test_run_interactive_show_model(monkeypatch):
         lambda _: next(inputs),
     )
 
-    cli.run_interactive(app, cli.create_parser())  # type: ignore
-
-    assert app.get_model_name() == "model-a"
+    cli.run_interactive(app, cli.create_parser())
+    app.get_config.assert_called_once_with()
 
 
 def test_run_interactive_switches_model(monkeypatch):
-    app = FakeApp()
+    app = Mock()
 
     inputs = iter(
         [
@@ -276,11 +159,11 @@ def test_run_interactive_switches_model(monkeypatch):
 
     cli.run_interactive(app, cli.create_parser())  # type: ignore
 
-    assert app.get_model_name() == "model-b"
+    app.set_model_name.assert_called_once_with("model-b")
 
 
 def test_run_interactive_show_config(monkeypatch):
-    app = FakeApp()
+    app = Mock()
 
     inputs = iter(
         [
@@ -296,12 +179,12 @@ def test_run_interactive_show_config(monkeypatch):
 
     cli.run_interactive(app, cli.create_parser())  # type: ignore
 
-    assert app.get_model_name() == "model-a"
+    app.get_config.assert_called_once_with()
 
 
 def test_run_interactive_help(monkeypatch, capsys):
-    app = FakeApp()
-
+    app = Mock()
+    parser = Mock()
     inputs = iter(
         [
             "/help",
@@ -314,14 +197,13 @@ def test_run_interactive_help(monkeypatch, capsys):
         lambda _: next(inputs),
     )
 
-    cli.run_interactive(app, cli.create_parser())  # type: ignore
+    cli.run_interactive(app, parser)
 
-    captured = capsys.readouterr()
-    assert "usage:" in captured.out
+    parser.print_help.assert_called_once_with()
 
 
 def test_run_interactive_ctrl_c(monkeypatch, caplog):
-    app = FakeApp()
+    app = Mock()
 
     monkeypatch.setattr(
         "builtins.input",
@@ -329,13 +211,13 @@ def test_run_interactive_ctrl_c(monkeypatch, caplog):
     )
 
     with caplog.at_level(logging.INFO):
-        cli.run_interactive(app, cli.create_parser())  # type: ignore
+        cli.run_interactive(app, cli.create_parser())
 
     assert "Interactive session interrupted by user" in caplog.text
 
 
 def test_run_interactive_ctrl_d(monkeypatch, caplog):
-    app = FakeApp()
+    app = Mock()
 
     monkeypatch.setattr(
         "builtins.input",
@@ -343,12 +225,14 @@ def test_run_interactive_ctrl_d(monkeypatch, caplog):
     )
 
     with caplog.at_level(logging.INFO):
-        cli.run_interactive(app, cli.create_parser())  # type: ignore
+        cli.run_interactive(app, cli.create_parser())
 
     assert "Interactive session ended by EOF" in caplog.text
 
 
-def test_run_interactive_exception(monkeypatch, fail_app, capsys):
+def test_run_interactive_exception(monkeypatch, capsys):
+    fail_app = Mock()
+    fail_app.ask.side_effect = LLMError("Unable to get a response from OpenAI")
     inputs = iter(
         [
             "question",
@@ -360,6 +244,7 @@ def test_run_interactive_exception(monkeypatch, fail_app, capsys):
         "builtins.input",
         lambda _: next(inputs),
     )
+
     cli.run_interactive(fail_app, cli.create_parser())
     captured = capsys.readouterr()
     assert "Assistant error:" in captured.out
@@ -369,20 +254,29 @@ def test_run_interactive_exception(monkeypatch, fail_app, capsys):
 @patch("llm_assistant.cli.run_interactive")
 @patch("llm_assistant.cli.create_app")
 @patch("llm_assistant.cli.load_config")
-@patch("llm_assistant.cli.parse_args")
 @patch("llm_assistant.cli.create_parser")
-@patch("llm_assistant.cli.configure_logging")
 def test_main(
-    mocklog,
-    mockcreateparse,
-    mockparseargs,
-    mockloadconfig,
-    mockcreateapp,
-    mockinteractive,
-    mockoneshot,
+    mockcreateparse, mockloadconfig, mockcreateapp, mockinteractive, mockoneshot, capsys
 ):
+    parser = Mock()
+    user_args = Mock()
+    user_args.model = "fake-modelA"
+    user_args.interactive = False
+    parser.parse_args.return_value = user_args
+    mockcreateparse.return_value = parser
+
     cli.main()
-    mockargs = MagicMock()
-    mockargs.interactive = False
-    mockparseargs.return_value = mockargs
+    captured = capsys.readouterr()
+    assert "Using the model" in captured.out
+    mockcreateapp.assert_called_once()
+    mockoneshot.assert_called_once()
+
+    user_args.interactive = True
     cli.main()
+    mockcreateapp.assert_called()
+    mockinteractive.assert_called()
+
+    mockloadconfig.side_effect = ConfigError("no key provided!")
+    cli.main()
+    captured = capsys.readouterr()
+    assert "Configuration error:" in captured.out

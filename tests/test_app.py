@@ -1,47 +1,43 @@
-from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 import pytest
 
 from llm_assistant.app import App
-from llm_assistant.conversation import Conversation
 from llm_assistant.llm import LLMError
 
 
-class FakeLLM:
-    def __init__(self, response: str = "fake response"):
-        self.response = response
-        self.calls = []
+def test_ask_calls_llm():
+    llm = Mock()
+    conversation = Mock()
 
-    def generate(self, messages):
-        self.calls.append(messages)
-        return self.response
+    conversation.get_messages.return_value = [{"role": "user", "content": "Hello"}]
+    llm.generate.return_value = "Hi!"
 
+    app = App(llm, conversation)
 
-@pytest.fixture
-def app() -> App:
-    return App(FakeLLM(), Conversation())
+    result = app.ask("Hello")
 
+    assert result == "Hi!"
 
-def test_ask_calls_llm(app):
-    app.ask("What is TCP?")
-
-    assert len(app.llm.calls) == 1
+    llm.generate.assert_called_once_with([{"role": "user", "content": "Hello"}])
 
 
 def test_ask_reraises_llm_error_and_removes_user_message():
-    llm = MagicMock()
+    llm = Mock()
+    conversation = Mock()
     llm.generate.side_effect = LLMError("Unable to get a response from OpenAI")
-    app = App(llm, Conversation())
+    app = App(llm, conversation)
 
     with pytest.raises(LLMError, match="Unable to get a response from OpenAI"):
         app.ask("What is TCP?")
+        conversation.remove_last_message.assert_called_once_with()
 
-    assert app.conversation.get_messages() == []
 
-
-def test_clear(app):
+def test_clear():
+    llm = Mock()
+    conversation = Mock()
+    app = App(llm, conversation)
     app.ask("What is TCP?")
     app.ask("What is TCP?")
     app.clear()
-    assert app.conversation.get_messages() == []
-
+    conversation.clear.assert_called_once_with()

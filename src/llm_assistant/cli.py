@@ -3,7 +3,7 @@ import logging
 import sys
 
 from llm_assistant.app import App, create_app
-from llm_assistant.config import LLMConfig, UserConfig, load_config
+from llm_assistant.config import UserConfig, load_config
 from llm_assistant.errors import ConfigError, LLMError
 
 
@@ -39,14 +39,9 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
-    args = parser.parse_args()
-    return args
-
-
 def run_one_shot(app: App, question: str | None) -> int:
     if not question:
-        print("You need to give an input question")
+        print("You need to give an input question.")
         return 1
 
     try:
@@ -117,7 +112,7 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
 def main() -> int:
     configure_logging()
     parser = create_parser()
-    args = parse_args(parser)
+    args = parser.parse_args()
     if args.model is not None:
         print(f"Using the model {args.model} to answer now...")
 
