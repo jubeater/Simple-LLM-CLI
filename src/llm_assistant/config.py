@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_MAX_TOKEN_LIMIT = 1000
 DEFAULT_TEMPERATURE = 1.0
+NETWORK_ERR_RETRY_THRESHOLD = 2
 
 
 @dataclass

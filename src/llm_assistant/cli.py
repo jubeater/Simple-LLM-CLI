@@ -39,18 +39,23 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_one_shot(app: App, question: str | None) -> int:
-    if not question:
-        print("You need to give an input question.")
-        return 1
-
+def print_llm_output(stream_output) -> int:
     try:
-        answer = app.ask(question)
-        print(f"Assistant: {answer}")
+        print("Assistant: ", end="")
+        for result in stream_output:
+            print(result, end="")
+        print()
         return 0
     except LLMError as error:
         print(f"Assistant error: {error}")
         return 1
+
+
+def run_one_shot(app: App, question: str | None) -> int:
+    if not question:
+        print("You need to give an input question.")
+        return 1
+    return print_llm_output(app.ask(question))
 
 
 def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
@@ -85,11 +90,42 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
 
         elif user_input == "/config":
             cur_config = app.get_config()
+
             print("Configuration")
             print("---------------------------------------")
             print(f"Model:            {cur_config.model}")
             print(f"Max output token: {cur_config.max_output_tokens}")
             print(f"Temperature:      {cur_config.temperature}")
+
+        elif user_input == "/stats":
+            stats = app.get_stats()
+            cur_config = app.get_config()
+            messages = app.get_num_messages()
+            avg_latency = (
+                None
+                if stats.total_latency == None
+                else (stats.total_latency / stats.request_count)
+            )
+            print("Session")
+            print("---------------------------------------")
+            print(f"Model:            {cur_config.model}")
+            print(f"Requests:         {stats.request_count}")
+            print(f"Messages:         {messages}")
+            print()
+            print("Tokens")
+            print("---------------------------------------")
+            print(f"Input:            {stats.total_usage.input_tokens}")
+            print(f"Output:           {stats.total_usage.output_tokens}")
+            print(f"Total:            {stats.total_usage.total_tokens}")
+            print()
+            print("Performance")
+            print("---------------------------------------")
+            print(f"Last latency:     {stats.last_latency}")
+            print(f"Average latency:  {avg_latency}")
+            print()
+            print("Errors")
+            print("---------------------------------------")
+            print(f"Failed requests:     {stats.error_count}")
 
         elif user_input == "/help":
             parser.print_help()
@@ -102,11 +138,7 @@ def run_interactive(app: App, parser: argparse.ArgumentParser) -> None:
             break
 
         else:
-            try:
-                answer = app.ask(user_input)
-                print(f"Assistant: {answer}\n")
-            except LLMError as error:
-                print(f"Assistant error: {error}")
+            print_llm_output(app.ask(user_input))
 
 
 def main() -> int:

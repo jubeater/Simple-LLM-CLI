@@ -4,7 +4,8 @@ import time
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI
 
 from llm_assistant.config import LLMConfig
-from llm_assistant.errors import LLMError
+from llm_assistant.errors import LLMError, LLMStreamError
+from llm_assistant.models import StreamResult, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -25,26 +26,44 @@ class LLM:
     def get_config(self) -> LLMConfig:
         return LLMConfig(self.model_name, self.max_output_token, self.temperature)
 
-    def generate(self, messages) -> str:
+    def generate_stream(self, messages):
         try:
             # https://developers.openai.com/api/docs/guides/conversation-state
             # Generate text with messages using different roles -> ["user", "assistant"]
             logger.info("LLM request started", extra={"model": self.model_name})
             start = time.perf_counter()
-            response = self.client.responses.create(
+            stream = self.client.responses.create(
                 model=self.model_name,
                 input=messages,
                 max_output_tokens=self.max_output_token,
                 temperature=self.temperature,
+                stream=True,
             )
-            duration = time.perf_counter() - start
-            logger.info(
-                "LLM request completed",
-                extra={"model": self.model_name, "duration": duration},
-            )
-            if not response.output_text or not response.output_text.strip():
-                raise LLMError("OpenAI return empty response body")
-            return response.output_text
+            for event in stream:
+                match event.type:
+                    case "response.output_text.delta":
+                        yield event.delta
+                    case "response.completed":
+                        total_duration = time.perf_counter() - start
+                        response_usage = event.response.usage
+
+                        if response_usage is None:
+                            usage = Usage(None, None, None)
+                        else:
+                            usage = Usage(
+                                response_usage.input_tokens,
+                                response_usage.output_tokens,
+                                response_usage.total_tokens,
+                            )
+                        yield StreamResult(
+                            usage=usage,
+                            total_duration=total_duration,
+                        )
+                    case "error":
+                        logger.error("LLM streaming error")
+                        raise LLMStreamError("LLM Streaming error")
+                    case _:
+                        continue
         except (APITimeoutError, APIStatusError, APIError) as error:
-            logger.exception("LLM request failed")
+            logger.exception("Unable to get a response from OpenAI")
             raise LLMError("Unable to get a response from OpenAI") from error
