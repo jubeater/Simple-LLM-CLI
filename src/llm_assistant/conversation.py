@@ -3,16 +3,20 @@ class Conversation:
         self.messages = []
 
     def add_user_message(self, content: str) -> None:
-        self.messages.append({
-            "role": "user",
-            "content": content,
-        })
+        self.messages.append(
+            {
+                "role": "user",
+                "content": content,
+            }
+        )
 
     def add_assistant_message(self, content: str) -> None:
-        self.messages.append({
-            "role": "assistant",
-            "content": content,
-        })
+        self.messages.append(
+            {
+                "role": "assistant",
+                "content": content,
+            }
+        )
 
     def remove_last_message(self) -> None:
         if len(self.messages) > 0:

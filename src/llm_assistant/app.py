@@ -18,10 +18,11 @@ class App:
     def ask(self, question: str):
         self.conversation.add_user_message(question)
         retry_count = 0
-        while retry_count < NETWORK_ERR_RETRY_THRESHOLD:
+        while True:
             try:
                 response_chunks = []
-                for event in self.llm.generate_stream(self.conversation.get_messages()):
+                messages = self.conversation.get_messages()
+                for event in self.llm.generate_stream(messages):
                     if isinstance(event, str):
                         response_chunks.append(event)
                         yield event
@@ -36,7 +37,6 @@ class App:
                         elif event.total_duration != None:
                             self.session_metrics.total_latency += event.total_duration
                         self.session_metrics.total_usage = event.usage
-                        continue
                 break
             except LLMError:
                 self.conversation.remove_last_message()
@@ -47,12 +47,19 @@ class App:
                 self.session_metrics.error_count += 1
                 raise
             except LLMStreamError:
+                if retry_count >= NETWORK_ERR_RETRY_THRESHOLD:
+                    self.conversation.remove_last_message()
+                    self.session_metrics.error_count += 1
+                    raise
+
                 retry_count += 1
                 logger.warning(
-                    f"LLM request failed, retrying ({retry_count}/{NETWORK_ERR_RETRY_THRESHOLD})"
+                    "LLM request failed, retrying",
+                    extra={
+                        "attempt": retry_count,
+                        "max_retries": NETWORK_ERR_RETRY_THRESHOLD,
+                    },
                 )
-                if retry_count > NETWORK_ERR_RETRY_THRESHOLD:
-                    raise
 
     def clear(self):
         self.conversation.clear()

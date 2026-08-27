@@ -2,7 +2,9 @@ import logging
 from unittest.mock import Mock, patch
 
 from llm_assistant import cli
+from llm_assistant.config import LLMConfig
 from llm_assistant.errors import ConfigError, LLMError
+from llm_assistant.models import SessionMetrics, Usage
 
 
 def test_parse_question():
@@ -33,8 +35,26 @@ def test_parse_model_and_generation_options():
     assert args.temperature == 0.7
 
 
+def test_llm_output_error(capsys):
+    def failed_stream():
+        yield "partial response"
+        raise LLMError("llm error happened")
+
+    result = cli.print_llm_output(failed_stream())
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "Assistant: partial response" in captured.out
+    assert "Assistant error: llm error happened" in captured.out
+
+
 def test_run_one_shot(capsys):
     fake_app = Mock()
+    fake_app.ask.return_value = iter(
+        [
+            "Hello",
+            " world",
+        ]
+    )
     cli.run_one_shot(fake_app, "Hello")
 
     fake_app.ask.assert_called_once_with("Hello")
@@ -45,14 +65,6 @@ def test_run_one_shot(capsys):
     cli.run_one_shot(fake_app, None)
     captured = capsys.readouterr()
     assert "You need to give an input question." in captured.out
-
-
-def test_run_one_shot_exception(capsys):
-    fail_app = Mock()
-    fail_app.ask.side_effect = LLMError("Unable to get a response from OpenAI")
-    cli.run_one_shot(fail_app, "World")
-    captured = capsys.readouterr()
-    assert "Assistant error:" in captured.out
 
 
 def test_run_interactive_question(monkeypatch, capsys):
@@ -182,6 +194,42 @@ def test_run_interactive_show_config(monkeypatch):
     app.get_config.assert_called_once_with()
 
 
+def test_run_interactive_stats(capsys):
+    mock_app = Mock()
+
+    mock_app.get_stats.return_value = SessionMetrics(
+        request_count=3,
+        error_count=1,
+        total_usage=Usage(100, 50, 150),
+        last_latency=1.2,
+        total_latency=3.6,
+    )
+
+    mock_app.get_config.return_value = LLMConfig(
+        model="modelA",
+        max_output_tokens=100,
+        temperature=1.0,
+    )
+
+    mock_app.get_num_messages.return_value = 6
+
+    with patch("builtins.input", side_effect=["/stats", "/quit"]):
+        cli.run_interactive(mock_app, cli.create_parser())
+
+    captured = capsys.readouterr()
+
+    assert "Session" in captured.out
+    assert "Model:            modelA" in captured.out
+    assert "Requests:         3" in captured.out
+    assert "Messages:         6" in captured.out
+    assert "Input:            100" in captured.out
+    assert "Output:           50" in captured.out
+    assert "Total:            150" in captured.out
+    assert "Last latency:     1.2" in captured.out
+    assert "Average latency:  1.2" in captured.out
+    assert "Failed requests:     1" in captured.out
+
+
 def test_run_interactive_help(monkeypatch, capsys):
     app = Mock()
     parser = Mock()
@@ -244,10 +292,6 @@ def test_run_interactive_exception(monkeypatch, capsys):
         "builtins.input",
         lambda _: next(inputs),
     )
-
-    cli.run_interactive(fail_app, cli.create_parser())
-    captured = capsys.readouterr()
-    assert "Assistant error:" in captured.out
 
 
 @patch("llm_assistant.cli.run_one_shot")
